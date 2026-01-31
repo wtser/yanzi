@@ -84,7 +84,7 @@
 
     .grid {
       display: grid;
-      grid-template-columns: 3fr 1fr;
+      grid-template-columns: 1fr;
       gap: 14px;
     }
 
@@ -108,7 +108,6 @@
 
     .main {
       display: grid;
-      grid-template-columns: 1.2fr 1fr;
       gap: 14px;
       align-items: stretch;
     }
@@ -117,10 +116,72 @@
       .main { grid-template-columns: 1fr; }
     }
 
+    .srOnly {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .bottomProgress {
+      margin-top: 14px;
+    }
+
     .status {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       gap: 10px;
+      align-items: stretch;
+    }
+
+    .statusInfo {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      flex: 2 1 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .statusInfo .stage {
+      flex: 0 0 auto;
+    }
+
+    .statusInfo .timer {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .statusInfo .metaRow {
+      flex: 0 0 auto;
+      margin-top: auto;
+    }
+
+    .statusControls {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.16);
+      flex: 1 1 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .statusControls .toast {
+      margin-top: auto;
+    }
+
+    @media (max-width: 520px) {
+      .status { flex-direction: column; }
     }
 
     .stage {
@@ -152,6 +213,7 @@
 
     .dot.work { background: var(--green); box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18); }
     .dot.rest { background: var(--amber); box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.20); }
+    .dot.paused { background: var(--red); box-shadow: 0 0 0 4px rgba(251, 113, 133, 0.18); }
     .dot.done { background: rgba(255,255,255,0.35); box-shadow: 0 0 0 4px rgba(255,255,255,0.10); }
 
     .timer {
@@ -159,7 +221,7 @@
       font-size: clamp(56px, 9vw, 84px);
       font-weight: 800;
       letter-spacing: 0.6px;
-      margin: 0;
+      margin: 18px 0;
       line-height: 1.04;
       text-shadow: 0 10px 30px rgba(0,0,0,0.34);
     }
@@ -195,10 +257,25 @@
       background: rgba(255,255,255,0.06);
       color: var(--text);
       border-radius: 16px;
-      padding: 12px 16px;
+      padding: 14px 18px;
       font-weight: 700;
+      font-size: 16px;
+      min-height: 52px;
       cursor: pointer;
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+      margin-top: 6px;
+    }
+
+    .controls button {
+      flex: 1 1 140px;
     }
 
     button:hover { background: rgba(255,255,255,0.10); }
@@ -233,6 +310,8 @@
 
     @media (max-width: 520px) {
       .config { grid-template-columns: 1fr; }
+      .controls { display: grid; grid-template-columns: 1fr 1fr; }
+      .controls button { width: 100%; padding: 18px 16px; border-radius: 20px; font-size: 18px; min-height: 62px; }
     }
 
     label {
@@ -303,6 +382,43 @@
       align-items: center;
     }
 
+    .section {
+      margin-top: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      overflow: hidden;
+    }
+
+    .sectionHeader {
+      padding: 10px 12px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      font-size: 13px;
+      color: var(--text);
+      background: rgba(255,255,255,0.05);
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .sectionBody {
+      padding: 12px;
+    }
+
+    .infoRow {
+      display: flex;
+      gap: 10px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .infoRow .kv {
+      margin-bottom: 0 !important;
+      flex: 0 0 auto;
+      min-width: 160px;
+    }
+
     .kbd {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 11px;
@@ -319,7 +435,7 @@
     <header>
       <div class="title">
         <h1>燕子飞计时记录</h1>
-        <div class="subtitle">每组 120s 训练 + 10s 休息，共 22 组。支持中途暂停/继续，自动保存进度（刷新不丢）。</div>
+        <div class="subtitle">默认每组 120s 训练 + 10s 休息，共 22 组。支持中途暂停/继续，自动保存进度（刷新不丢）。</div>
       </div>
       <div class="pill">
         <span class="kbd">Space</span>
@@ -331,49 +447,84 @@
       <div class="card">
         <div class="inner main">
           <div class="status">
-            <div class="stage">
-              <div class="badge" id="stageBadge">
-                <span class="dot work" id="stageDot"></span>
-                <span id="stageText">准备</span>
+            <div class="statusInfo">
+              <div class="stage">
+                <div class="badge" id="stageBadge">
+                  <span class="dot work" id="stageDot"></span>
+                  <span id="stageText">准备</span>
+                </div>
+                <div class="badge">
+                  <span>目标</span>
+                  <strong id="targetSets">22</strong>
+                  <span>组</span>
+                </div>
               </div>
-              <div class="badge">
-                <span>目标</span>
-                <strong id="targetSets">22</strong>
-                <span>组</span>
+
+              <p class="timer" id="timerText">02:00</p>
+
+              <div class="metaRow">
+                <div class="kv">
+                  <div class="k">当前组</div>
+                  <div class="v"><span id="currentSet">1</span>/<span id="totalSets">22</span></div>
+                </div>
+                <div class="kv">
+                  <div class="k">已完成</div>
+                  <div class="v"><span id="completedSets">0</span> 组</div>
+                </div>
               </div>
             </div>
 
-            <p class="timer" id="timerText">02:00</p>
-
-            <div class="metaRow">
-              <div class="kv">
-                <div class="k">当前组</div>
-                <div class="v"><span id="currentSet">1</span>/<span id="totalSets">22</span></div>
-              </div>
-              <div class="kv">
-                <div class="k">已完成</div>
-                <div class="v"><span id="completedSets">0</span> 组</div>
+            <div class="statusControls">
+              <div class="controls">
+                <button class="primary" id="btnMain">开始</button>
+                <button class="danger" id="btnReset">重置</button>
               </div>
             </div>
-
-            <div class="controls">
-              <button class="primary" id="btnStart">开始</button>
-              <button class="secondary" id="btnPause" disabled>暂停</button>
-              <button class="secondary" id="btnResume" disabled>继续</button>
-              <button class="danger" id="btnReset">重置</button>
-            </div>
-
-            <div class="toast" id="toast">就绪。点击“开始”或按空格键。</div>
           </div>
+        </div>
 
-          <div>
-            <div class="kv" style="margin-bottom: 10px;">
-              <div class="k">本阶段进度</div>
-              <div class="v" id="phaseProgressText">0%</div>
+        <div class="bottomProgress">
+          <span id="phaseProgressText" class="srOnly">0%</span>
+          <div class="progress" aria-hidden="true"><div class="bar" id="phaseBar"></div></div>
+        </div>
+        <div class="side">
+          <div class="inner hint">
+            快捷键：<span class="kbd">Space</span> 开始/暂停。页面会自动保存进度；想清零请点击“重置”。
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="inner">
+          <div class="infoRow" aria-label="概览">
+            <div class="kv">
+              <div class="k">今日记录</div>
+              <div class="v" id="todaySummary">—</div>
             </div>
-            <div class="progress" aria-hidden="true"><div class="bar" id="phaseBar"></div></div>
+            <div class="kv">
+              <div class="k">状态</div>
+              <div class="v" id="runState">未开始</div>
+            </div>
+            <div class="kv">
+              <div class="k">防止息屏</div>
+              <div class="v" id="wakeLockState">—</div>
+            </div>
+            <div class="kv">
+              <div class="k">数据保存</div>
+              <div class="v" id="persistState">本地自动保存</div>
+            </div>
+          </div>
+          <div class="hint" style="margin-top: 12px;">
+            如果你希望“每天自动清零”，我也可以加一个“按日期归档”的记录表。
+          </div>
+        </div>
+      </div>
 
-            <div class="inner" style="padding: 0; margin-top: 14px;">
+      <div class="card">
+        <div class="inner">
+          <div class="section" aria-label="设置">
+            <div class="sectionHeader">设置</div>
+            <div class="sectionBody">
               <div class="config">
                 <label>
                   训练时长（秒）
@@ -409,35 +560,6 @@
             </div>
           </div>
         </div>
-        <div class="side">
-          <div class="inner hint">
-            快捷键：<span class="kbd">Space</span> 开始/暂停。页面会自动保存进度；想清零请点击“重置”。
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="inner">
-          <div class="kv" style="margin-bottom: 10px;">
-            <div class="k">今日记录</div>
-            <div class="v" id="todaySummary">—</div>
-          </div>
-          <div class="kv" style="margin-bottom: 10px;">
-            <div class="k">状态</div>
-            <div class="v" id="runState">未开始</div>
-          </div>
-          <div class="kv" style="margin-bottom: 10px;">
-            <div class="k">防止息屏</div>
-            <div class="v" id="wakeLockState">—</div>
-          </div>
-          <div class="kv">
-            <div class="k">数据保存</div>
-            <div class="v" id="persistState">本地自动保存</div>
-          </div>
-          <div class="hint" style="margin-top: 12px;">
-            如果你希望“每天自动清零”，我也可以加一个“按日期归档”的记录表。
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -453,9 +575,7 @@
       totalSets: document.getElementById('totalSets'),
       targetSets: document.getElementById('targetSets'),
       completedSets: document.getElementById('completedSets'),
-      btnStart: document.getElementById('btnStart'),
-      btnPause: document.getElementById('btnPause'),
-      btnResume: document.getElementById('btnResume'),
+      btnMain: document.getElementById('btnMain'),
       btnReset: document.getElementById('btnReset'),
       toast: document.getElementById('toast'),
       phaseBar: document.getElementById('phaseBar'),
@@ -518,14 +638,16 @@
     }
 
     function setDot(phase) {
-      els.stageDot.classList.remove('work', 'rest', 'done');
+      els.stageDot.classList.remove('work', 'rest', 'paused', 'done');
       if (phase === 'work') els.stageDot.classList.add('work');
       else if (phase === 'rest') els.stageDot.classList.add('rest');
+      else if (phase === 'paused') els.stageDot.classList.add('paused');
       else if (phase === 'done') els.stageDot.classList.add('done');
       else els.stageDot.classList.add('done');
     }
 
     function toast(msg) {
+      if (!els.toast) return;
       els.toast.textContent = msg;
     }
 
@@ -643,12 +765,13 @@
       if (!synth || !synth.getVoices) return;
 
       const voices = synth.getVoices();
+      const zhVoices = voices.filter((v) => v && v.lang && String(v.lang).toLowerCase().startsWith('zh'));
       const previous = els.voiceSelect.value;
       const desired = state.config.voiceURI ? String(state.config.voiceURI) : '';
 
       els.voiceSelect.innerHTML = '<option value="">系统默认</option>';
 
-      for (const v of voices) {
+      for (const v of zhVoices) {
         if (!v || !v.voiceURI) continue;
         const opt = document.createElement('option');
         opt.value = v.voiceURI;
@@ -665,11 +788,14 @@
       };
 
       const pickDefaultVoiceURI = () => {
-        const googleCN = voices.find((v) => v && v.lang === 'zh-CN' && v.name === 'Google 普通话（中国大陆）');
+        const googleCN = zhVoices.find((v) => v && v.lang === 'zh-CN' && v.name === 'Google 普通话（中国大陆）');
         if (googleCN && googleCN.voiceURI) return googleCN.voiceURI;
 
-        const anyZhCN = voices.find((v) => v && v.lang === 'zh-CN');
+        const anyZhCN = zhVoices.find((v) => v && v.lang === 'zh-CN');
         if (anyZhCN && anyZhCN.voiceURI) return anyZhCN.voiceURI;
+
+        const anyZh = zhVoices[0];
+        if (anyZh && anyZh.voiceURI) return anyZh.voiceURI;
 
         return '';
       };
@@ -689,6 +815,10 @@
       }
 
       els.voiceSelect.value = '';
+      if (state.config.voiceURI) {
+        state.config.voiceURI = '';
+        saveState();
+      }
     }
 
     if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener === 'function') {
@@ -818,8 +948,13 @@
     }
 
     function updateUI() {
-      els.stageText.textContent = stageLabel(state.phase);
-      setDot(state.phase);
+      if (state.paused && state.phase !== 'idle' && state.phase !== 'done') {
+        els.stageText.textContent = '暂停训练';
+        setDot('paused');
+      } else {
+        els.stageText.textContent = stageLabel(state.phase);
+        setDot(state.phase);
+      }
 
       els.timerText.textContent = formatMs(state.phaseRemainingMs);
       els.currentSet.textContent = String(state.currentSet);
@@ -833,11 +968,21 @@
       els.phaseBar.style.width = `${(pctClamped * 100).toFixed(1)}%`;
       els.phaseProgressText.textContent = `${Math.round(pctClamped * 100)}%`;
 
-      const canStart = state.phase === 'idle' || state.phase === 'done';
-      els.btnStart.disabled = !canStart;
-
-      els.btnPause.disabled = !(state.running && !state.paused && state.phase !== 'done');
-      els.btnResume.disabled = !(state.running && state.paused && state.phase !== 'done');
+      if (els.btnMain) {
+        if (state.phase === 'idle' || state.phase === 'done') {
+          els.btnMain.textContent = '开始';
+          els.btnMain.disabled = false;
+        } else if (!state.running) {
+          els.btnMain.textContent = '开始';
+          els.btnMain.disabled = false;
+        } else if (state.paused) {
+          els.btnMain.textContent = '继续';
+          els.btnMain.disabled = false;
+        } else {
+          els.btnMain.textContent = '暂停';
+          els.btnMain.disabled = false;
+        }
+      }
 
       if (state.phase === 'done') {
         els.runState.textContent = '已完成';
@@ -1035,9 +1180,25 @@
       else pauseRoutine();
     }
 
-    els.btnStart.addEventListener('click', startRoutine);
-    els.btnPause.addEventListener('click', pauseRoutine);
-    els.btnResume.addEventListener('click', resumeRoutine);
+    function handleMainButton() {
+      if (state.phase === 'idle' || state.phase === 'done') {
+        startRoutine();
+        return;
+      }
+      if (!state.running) {
+        startRoutine();
+        return;
+      }
+      if (state.paused) {
+        resumeRoutine();
+        return;
+      }
+      pauseRoutine();
+    }
+
+    if (els.btnMain) {
+      els.btnMain.addEventListener('click', handleMainButton);
+    }
     els.btnReset.addEventListener('click', resetRoutine);
 
     document.addEventListener('keydown', (e) => {

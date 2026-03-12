@@ -1025,8 +1025,8 @@
       state.startedAtLocalISO = new Date().toISOString();
 
       setPhase('work', state.config.workSeconds * 1000);
-      toast(`开始第 ${state.currentSet} 组燕子飞。`);
-      speak(`开始第${state.currentSet}组燕子飞`);
+      toast(`开始训练：第 ${state.currentSet} 组燕子飞。`);
+      speak(`开始训练，第${state.currentSet}组燕子飞`);
       beep(660, 160, 0.06);
 
       runTicker();
@@ -1037,7 +1037,9 @@
       if (!state.running || state.paused || state.phase === 'done') return;
       state.paused = true;
       state.lastTs = null;
-      toast('已暂停。');
+      toast('暂停训练。');
+      speak('暂停训练');
+      beep(520, 140, 0.05);
       syncWakeLockWithState();
       updateUI();
       saveState();
@@ -1047,7 +1049,9 @@
       if (!state.running || !state.paused || state.phase === 'done') return;
       state.paused = false;
       state.lastTs = null;
-      toast('继续。');
+      toast('继续训练。');
+      speak('继续训练');
+      beep(660, 160, 0.06);
       syncWakeLockWithState();
       updateUI();
       saveState();
@@ -1071,7 +1075,10 @@
       state.startedAtLocalISO = null;
 
       clearSavedState();
-      toast('已重置。');
+      toast('重置训练。');
+      speak('重置训练');
+      beep(392, 120, 0.05);
+      setTimeout(() => beep(330, 160, 0.05), 140);
       syncWakeLockWithState();
       updateUI();
       saveState();
@@ -1084,7 +1091,8 @@
       state.phaseDurationMs = 0;
       state.phaseRemainingMs = 0;
       state.lastTs = null;
-      toast('全部完成！');
+      toast('训练完成！');
+      speak('训练完成');
       syncWakeLockWithState();
       updateUI();
       saveState();
@@ -1102,14 +1110,14 @@
         }
 
         if (state.config.restSeconds > 0) {
-          toast(`休息 ${state.config.restSeconds} 秒。`);
-          speak(`休息${state.config.restSeconds}秒`);
+          toast(`开始休息：${state.config.restSeconds} 秒。`);
+          speak(`开始休息，${state.config.restSeconds}秒`);
           beep(440, 140, 0.05);
           setPhase('rest', state.config.restSeconds * 1000);
         } else {
           state.currentSet += 1;
-          toast(`开始第 ${state.currentSet} 组燕子飞。`);
-          speak(`开始第${state.currentSet}组燕子飞`);
+          toast(`开始训练：第 ${state.currentSet} 组燕子飞。`);
+          speak(`开始训练，第${state.currentSet}组燕子飞`);
           beep(660, 160, 0.06);
           setPhase('work', state.config.workSeconds * 1000);
         }
@@ -1118,8 +1126,8 @@
 
       if (state.phase === 'rest') {
         state.currentSet += 1;
-        toast(`开始第 ${state.currentSet} 组燕子飞。`);
-        speak(`开始第${state.currentSet}组燕子飞`);
+        toast(`开始训练：第 ${state.currentSet} 组燕子飞。`);
+        speak(`开始训练，第${state.currentSet}组燕子飞`);
         beep(660, 160, 0.06);
         setPhase('work', state.config.workSeconds * 1000);
         return;

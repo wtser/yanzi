@@ -407,6 +407,8 @@
     };
 
     const defaultConfig = { workSeconds: 120, restSeconds: 10, totalSets: 22, sound: true, voiceURI: '', wakeLock: true };
+    const transitionVoiceLeadMs = 2600;
+    const transitionVoiceMaxWaitMs = 7000;
     const phaseEmojis = { idle: '🐦', work: '💪', rest: '😌', done: '🎉' };
 
     let tickTimer = null;
@@ -416,6 +418,7 @@
     let speechNeedsGesture = false;
     let lastUserActivationAt = 0;
     let lastForegroundRestoreAt = 0;
+    let preTransitionAnnouncement = null;
 
     let state = {
       config: { ...defaultConfig },
@@ -830,6 +833,7 @@
 
     if (els.voiceSelect) {
       els.voiceSelect.addEventListener('change', () => {
+        clearPreTransitionAnnouncement();
         state.config.voiceURI = els.voiceSelect.value ? String(els.voiceSelect.value) : '';
         saveState();
         speak('语音音色已切换', 200, { forceCancel: true });
@@ -1028,19 +1032,135 @@
       state.lastTs = null;
     }
 
-    function announceRestStart() {
+    function clearPreTransitionAnnouncement() {
+      preTransitionAnnouncement = null;
+    }
+
+    function restStartSpeechText() {
+      return `开始休息，${state.config.restSeconds}秒`;
+    }
+
+    function workStartSpeechText(setNumber) {
+      return `开始训练，第${setNumber}组燕子飞`;
+    }
+
+    function getPreTransitionCue() {
+      if (!state.running || state.paused || !isActivePhase(state.phase)) return null;
+
+      if (state.phase === 'work') {
+        if (state.currentSet >= state.config.totalSets) return null;
+
+        if (state.config.restSeconds > 0) {
+          return {
+            key: `work:${state.currentSet}:rest:${state.config.restSeconds}`,
+            text: restStartSpeechText(),
+          };
+        }
+
+        const nextSet = state.currentSet + 1;
+        return {
+          key: `work:${state.currentSet}:work:${nextSet}`,
+          text: workStartSpeechText(nextSet),
+        };
+      }
+
+      if (state.phase === 'rest') {
+        const nextSet = state.currentSet + 1;
+        return {
+          key: `rest:${state.currentSet}:work:${nextSet}`,
+          text: workStartSpeechText(nextSet),
+        };
+      }
+
+      return null;
+    }
+
+    function startPreTransitionAnnouncement(cue) {
+      const announcement = {
+        key: cue.key,
+        startedAtEpochMs: epochMs(),
+        finishedAtEpochMs: null,
+        settled: false,
+      };
+      preTransitionAnnouncement = announcement;
+
+      const settle = () => {
+        if (preTransitionAnnouncement !== announcement || announcement.settled) return;
+        announcement.settled = true;
+        announcement.finishedAtEpochMs = epochMs();
+      };
+
+      const timeoutId = setTimeout(() => {
+        if (preTransitionAnnouncement === announcement && !announcement.settled) {
+          restoreSpeechQueue(true);
+        }
+        settle();
+      }, transitionVoiceMaxWaitMs);
+      speak(cue.text, 0, { forceCancel: true, showTapHint: true })
+        .then(settle)
+        .catch(settle)
+        .finally(() => clearTimeout(timeoutId));
+    }
+
+    function maybeStartPreTransitionAnnouncement(now, announceTransitions) {
+      if (!announceTransitions || !isPageVisible()) return;
+      const cue = getPreTransitionCue();
+      if (!cue) {
+        clearPreTransitionAnnouncement();
+        return;
+      }
+
+      if (preTransitionAnnouncement && preTransitionAnnouncement.key === cue.key) return;
+
+      const endsAt = finiteNumber(state.phaseEndsAtEpochMs, 0);
+      if (endsAt <= 0) return;
+
+      const remainingMs = endsAt - now;
+      if (remainingMs > transitionVoiceLeadMs || remainingMs < -1000) return;
+      startPreTransitionAnnouncement(cue);
+    }
+
+    function getMatchingPreTransitionAnnouncement(cue) {
+      if (!cue || !preTransitionAnnouncement) return null;
+      if (preTransitionAnnouncement.key !== cue.key) return null;
+      return preTransitionAnnouncement;
+    }
+
+    function shouldWaitForPreTransitionAnnouncement(cue) {
+      const announcement = getMatchingPreTransitionAnnouncement(cue);
+      return !!announcement && !announcement.settled;
+    }
+
+    function nextPhaseStartEpochMs(endedAt, now, cue) {
+      const announcement = getMatchingPreTransitionAnnouncement(cue);
+      if (announcement && announcement.finishedAtEpochMs && announcement.finishedAtEpochMs > endedAt) return now;
+      return endedAt;
+    }
+
+    function consumePreTransitionAnnouncement(cue) {
+      if (!cue || !preTransitionAnnouncement || preTransitionAnnouncement.key !== cue.key) return false;
+      preTransitionAnnouncement = null;
+      return true;
+    }
+
+    function announceRestStart(options) {
+      const opts = options || {};
       toast(`休息 ${state.config.restSeconds} 秒，喝口水 😌`);
-      speak(`开始休息，${state.config.restSeconds}秒`);
+      if (opts.speak !== false) speak(restStartSpeechText());
       beep(440, 140, 0.05);
     }
 
-    function announceWorkStart(fromRest) {
+    function announceWorkStart(fromRest, options) {
+      const opts = options || {};
       toast(fromRest ? `第 ${state.currentSet} 组，燕子飞！💪` : `第 ${state.currentSet} 组，继续加油 💪`);
-      speak(`开始训练，第${state.currentSet}组燕子飞`);
+      if (opts.speak !== false) speak(workStartSpeechText(state.currentSet));
       beep(660, 160, 0.06);
     }
 
-    function advanceAfterWork(endedAt, now, announce) {
+    function advanceAfterWork(endedAt, now, announce, cue) {
+      const startAt = nextPhaseStartEpochMs(endedAt, now, cue);
+      const alreadySpoken = consumePreTransitionAnnouncement(cue);
+
       state.completedSets = state.currentSet;
       if (state.currentSet >= state.config.totalSets) {
         finishRoutine({ announce });
@@ -1048,20 +1168,23 @@
       }
 
       if (state.config.restSeconds > 0) {
-        if (announce) announceRestStart();
-        setPhase('rest', state.config.restSeconds * 1000, { startedAtEpochMs: endedAt, now, deferRender: true });
+        if (announce) announceRestStart({ speak: !alreadySpoken });
+        setPhase('rest', state.config.restSeconds * 1000, { startedAtEpochMs: startAt, now, deferRender: true });
         return;
       }
 
       state.currentSet += 1;
-      if (announce) announceWorkStart(false);
-      setPhase('work', state.config.workSeconds * 1000, { startedAtEpochMs: endedAt, now, deferRender: true });
+      if (announce) announceWorkStart(false, { speak: !alreadySpoken });
+      setPhase('work', state.config.workSeconds * 1000, { startedAtEpochMs: startAt, now, deferRender: true });
     }
 
-    function advanceAfterRest(endedAt, now, announce) {
+    function advanceAfterRest(endedAt, now, announce, cue) {
+      const startAt = nextPhaseStartEpochMs(endedAt, now, cue);
+      const alreadySpoken = consumePreTransitionAnnouncement(cue);
+
       state.currentSet += 1;
-      if (announce) announceWorkStart(true);
-      setPhase('work', state.config.workSeconds * 1000, { startedAtEpochMs: endedAt, now, deferRender: true });
+      if (announce) announceWorkStart(true, { speak: !alreadySpoken });
+      setPhase('work', state.config.workSeconds * 1000, { startedAtEpochMs: startAt, now, deferRender: true });
     }
 
     function advanceExpiredPhases(now, announceTransitions) {
@@ -1069,6 +1192,7 @@
 
       ensurePhaseClock(now);
       updateRemainingFromClock(now);
+      maybeStartPreTransitionAnnouncement(now, announceTransitions);
 
       let changed = false;
       let guard = 0;
@@ -1076,9 +1200,12 @@
       while (state.running && !state.paused && isActivePhase(state.phase) && state.phaseEndsAtEpochMs <= now && guard < 2500) {
         const endedAt = state.phaseEndsAtEpochMs;
         const endedPhase = state.phase;
+        const cue = getPreTransitionCue();
 
-        if (endedPhase === 'work') advanceAfterWork(endedAt, now, announceTransitions);
-        else if (endedPhase === 'rest') advanceAfterRest(endedAt, now, announceTransitions);
+        if (announceTransitions && shouldWaitForPreTransitionAnnouncement(cue)) break;
+
+        if (endedPhase === 'work') advanceAfterWork(endedAt, now, announceTransitions, cue);
+        else if (endedPhase === 'rest') advanceAfterRest(endedAt, now, announceTransitions, cue);
 
         changed = true;
         guard += 1;
@@ -1177,6 +1304,7 @@
     }
 
     function startRoutine() {
+      clearPreTransitionAnnouncement();
       state.config = readConfigFromInputs();
       applyConfigToInputs(state.config);
       unlockAudioOutput(false);
@@ -1200,6 +1328,7 @@
     function pauseRoutine() {
       if (!state.running || state.paused || state.phase === 'done') return;
 
+      clearPreTransitionAnnouncement();
       const now = epochMs();
       reconcileClock({ now, announceTransitions: false });
       if (!state.running || state.phase === 'done') return;
@@ -1219,6 +1348,7 @@
     function resumeRoutine() {
       if (!state.running || !state.paused || state.phase === 'done') return;
 
+      clearPreTransitionAnnouncement();
       unlockAudioOutput(speechNeedsGesture);
       state.paused = false;
       resumePhaseClock(epochMs());
@@ -1235,6 +1365,7 @@
       const ok = confirm('确定要重置吗？这会清空当前进度。');
       if (!ok) return;
 
+      clearPreTransitionAnnouncement();
       state.config = readConfigFromInputs();
       applyConfigToInputs(state.config);
 
@@ -1264,6 +1395,7 @@
     function finishRoutine(options) {
       const announce = !options || options.announce !== false;
 
+      clearPreTransitionAnnouncement();
       state.phase = 'done';
       state.running = false;
       state.paused = false;
@@ -1318,6 +1450,7 @@
     }
 
     function handlePageHidden() {
+      clearPreTransitionAnnouncement();
       if (state.running && !state.paused && isActivePhase(state.phase)) {
         reconcileClock({ now: epochMs(), announceTransitions: false });
         state.wasHiddenAtEpochMs = epochMs();

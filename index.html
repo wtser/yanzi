@@ -301,13 +301,13 @@
   <div class="wrap">
 
     <div class="header">
-      <h1>🐦 燕子飞训练</h1>
+      <h1>👑 燕子飞训练</h1>
       <p>加油！坚持就是胜利 ✨</p>
     </div>
 
     <div class="main-card">
       <div class="phase-display">
-        <span class="phase-emoji" id="phaseEmoji">🐦</span>
+        <span class="phase-emoji" id="phaseEmoji">👑</span>
         <span class="phase-label" id="stageText">准备开始</span>
       </div>
 
@@ -409,7 +409,7 @@
     const defaultConfig = { workSeconds: 120, restSeconds: 10, totalSets: 22, sound: true, voiceURI: '', wakeLock: true };
     const transitionVoiceLeadMs = 2600;
     const transitionVoiceMaxWaitMs = 7000;
-    const phaseEmojis = { idle: '🐦', work: '💪', rest: '😌', done: '🎉' };
+    const phaseEmojis = { idle: '👑', work: '🧜‍♀️', rest: '🍹', done: '🎉' };
 
     let tickTimer = null;
     let wakeLockSentinel = null;
@@ -1152,7 +1152,7 @@
 
     function announceWorkStart(fromRest, options) {
       const opts = options || {};
-      toast(fromRest ? `第 ${state.currentSet} 组，燕子飞！💪` : `第 ${state.currentSet} 组，继续加油 💪`);
+      toast(fromRest ? `第 ${state.currentSet} 组，燕子飞！🧜‍♀️` : `第 ${state.currentSet} 组，继续加油 🧜‍♀️`);
       if (opts.speak !== false) speak(workStartSpeechText(state.currentSet));
       beep(660, 160, 0.06);
     }
@@ -1245,7 +1245,7 @@
       const isPaused = state.paused && state.phase !== 'idle' && state.phase !== 'done';
 
       if (els.phaseEmoji) {
-        els.phaseEmoji.textContent = isPaused ? '⏸️' : (phaseEmojis[state.phase] || '🐦');
+        els.phaseEmoji.textContent = isPaused ? '🥳' : (phaseEmojis[state.phase] || '👑');
       }
 
       els.stageText.textContent = isPaused ? '已暂停' : stageLabel(state.phase);
@@ -1280,7 +1280,7 @@
           els.btnMain.textContent = '继续 ▶️';
           els.btnMain.disabled = false;
         } else {
-          els.btnMain.textContent = '暂停 ⏸';
+          els.btnMain.textContent = '暂停 🥳';
           els.btnMain.disabled = false;
         }
       }
@@ -1317,7 +1317,7 @@
       state.wasHiddenAtEpochMs = null;
 
       setPhase('work', state.config.workSeconds * 1000);
-      toast(`开始训练：第 ${state.currentSet} 组燕子飞 💪`);
+      toast(`开始训练：第 ${state.currentSet} 组燕子飞 🧜‍♀️`);
       speak(`开始训练，第${state.currentSet}组燕子飞`);
       beep(660, 160, 0.06);
 
@@ -1554,7 +1554,7 @@
       if (loaded) {
         applyConfigToInputs(state.config);
         if (state.phase === 'idle' || state.phase === 'done') {
-          toast('已恢复上次进度，点击开始继续 🐦');
+          toast('已恢复上次进度，点击开始继续 👑');
         } else {
           toast('上次进度已恢复，点击继续 ▶️');
           state.running = true;

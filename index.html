@@ -406,7 +406,60 @@
       persistState: document.getElementById('persistState'),
     };
 
-    const defaultConfig = { workSeconds: 120, restSeconds: 10, totalSets: 22, sound: true, voiceURI: '', wakeLock: true };
+    const defaultConfig = { workSeconds: 120, restSeconds: 10, totalSets: 22, sound: true, voiceLang: 'zh', voiceURI: '', wakeLock: true };
+    const speechTexts = {
+      zh: {
+        label: '中文',
+        langCode: 'zh-CN',
+        restStart: (sec) => `开始休息，${sec}秒`,
+        workStart: (n) => `开始训练，第${n}组燕子飞`,
+        pause: '暂停训练',
+        resume: '继续训练',
+        reset: '重置训练',
+        finish: '训练完成，太棒了',
+        voiceChanged: '语音音色已切换',
+        recoveredDone: '训练已完成',
+        recoveredWork: (n, left) => `已恢复，第${n}组训练，剩余${left}`,
+        recoveredRest: (left) => `已恢复，休息中，剩余${left}`,
+        recovered: '已恢复',
+        minutes: (m) => `${m}分钟`,
+        seconds: (s) => `${s}秒`,
+      },
+      ja: {
+        label: '日本語',
+        langCode: 'ja-JP',
+        restStart: (sec) => `休憩、${sec}秒`,
+        workStart: (n) => `トレーニング開始、${n}セット目`,
+        pause: '一時停止',
+        resume: 'トレーニング再開',
+        reset: 'リセットしました',
+        finish: 'トレーニング完了、お疲れさまでした',
+        voiceChanged: '音声を切り替えました',
+        recoveredDone: 'トレーニングは完了しています',
+        recoveredWork: (n, left) => `復帰しました、${n}セット目、残り${left}`,
+        recoveredRest: (left) => `復帰しました、休憩中、残り${left}`,
+        recovered: '復帰しました',
+        minutes: (m) => `${m}分`,
+        seconds: (s) => `${s}秒`,
+      },
+      en: {
+        label: 'English',
+        langCode: 'en-US',
+        restStart: (sec) => `Rest, ${sec} ${sec === 1 ? 'second' : 'seconds'}`,
+        workStart: (n) => `Start training, set ${n}`,
+        pause: 'Training paused',
+        resume: 'Training resumed',
+        reset: 'Training reset',
+        finish: 'Training complete, great job',
+        voiceChanged: 'Voice changed',
+        recoveredDone: 'Training complete',
+        recoveredWork: (n, left) => `Resumed, set ${n}, ${left} left`,
+        recoveredRest: (left) => `Resumed, resting, ${left} left`,
+        recovered: 'Resumed',
+        minutes: (m) => `${m} ${m === 1 ? 'minute' : 'minutes'}`,
+        seconds: (s) => `${s} ${s === 1 ? 'second' : 'seconds'}`,
+      },
+    };
     const transitionVoiceLeadMs = 2600;
     const transitionVoiceMaxWaitMs = 7000;
     const phaseEmojis = { idle: '👑', work: '🧜‍♀️', rest: '🍹', done: '🎉' };
@@ -470,10 +523,23 @@
       return `${pad2(m)}:${pad2(s)}`;
     }
 
-    function formatDurationForSpeech(ms) {
+    function normalizeVoiceLang(lang) {
+      return Object.keys(speechTexts).includes(lang) ? lang : defaultConfig.voiceLang;
+    }
+
+    function voiceLangOf(voice) {
+      const lang = String((voice && voice.lang) || '').toLowerCase();
+      return Object.keys(speechTexts).find((key) => lang.startsWith(key)) || null;
+    }
+
+    function currentSpeechTexts() {
+      return speechTexts[normalizeVoiceLang(state.config.voiceLang)];
+    }
+
+    function formatDurationForSpeech(ms, texts) {
       const totalSec = Math.max(0, Math.ceil(ms / 1000));
-      if (totalSec >= 60) return `${Math.ceil(totalSec / 60)}分钟`;
-      return `${totalSec}秒`;
+      if (totalSec >= 60) return texts.minutes(Math.ceil(totalSec / 60));
+      return texts.seconds(totalSec);
     }
 
     function stageLabel(phase) {
@@ -508,14 +574,15 @@
       const r = parseInt(String(els.restSeconds.value || ''), 10);
       const t = parseInt(String(els.setCount.value || ''), 10);
       const sound = !!els.soundToggle.checked;
-      const voiceURI = String(els.voiceSelect && els.voiceSelect.value ? els.voiceSelect.value : '');
+      // Voice settings are synced on change; the select can be empty until voices load.
+      const { voiceLang, voiceURI } = state.config;
       const wakeLock = !!(els.wakeLockToggle && els.wakeLockToggle.checked);
 
       const workSeconds = Number.isFinite(w) ? clamp(w, 1, 3600) : defaultConfig.workSeconds;
       const restSeconds = Number.isFinite(r) ? clamp(r, 0, 3600) : defaultConfig.restSeconds;
       const totalSets = Number.isFinite(t) ? clamp(t, 1, 999) : defaultConfig.totalSets;
 
-      return { workSeconds, restSeconds, totalSets, sound, voiceURI, wakeLock };
+      return { workSeconds, restSeconds, totalSets, sound, voiceLang, voiceURI, wakeLock };
     }
 
     function applyConfigToInputs(cfg) {
@@ -600,6 +667,7 @@
           restSeconds: cfg.restSeconds !== undefined ? Number(cfg.restSeconds) || 0 : defaultConfig.restSeconds,
           totalSets: Number(cfg.totalSets) || defaultConfig.totalSets,
           sound: cfg.sound !== undefined ? !!cfg.sound : defaultConfig.sound,
+          voiceLang: normalizeVoiceLang(cfg.voiceLang),
           voiceURI: cfg.voiceURI !== undefined ? String(cfg.voiceURI) : defaultConfig.voiceURI,
           wakeLock: cfg.wakeLock !== undefined ? !!cfg.wakeLock : defaultConfig.wakeLock,
         };
@@ -631,30 +699,43 @@
       } catch (e) {}
     }
 
+    // Apple's lightweight screen-reader voices sound robotic, so they are hidden.
+    function isRoboticVoice(voice) {
+      return /eloquence/i.test(String(voice.voiceURI || ''))
+        || /^(Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley)(\s|\(|$)/.test(String(voice.name || ''));
+    }
+
     function getVoices(synth) {
       try {
-        return synth && synth.getVoices ? synth.getVoices() : [];
+        const voices = synth && synth.getVoices ? synth.getVoices() : [];
+        return voices.filter((v) => v && !isRoboticVoice(v));
       } catch (e) {
         return [];
       }
     }
 
+    function filterLangVoices(voices, lang) {
+      return voices.filter((v) => v && voiceLangOf(v) === lang);
+    }
+
     function getPreferredVoice(synth) {
       const voices = getVoices(synth);
-      if (!voices.length) return null;
 
       if (state.config.voiceURI) {
         const selected = voices.find((v) => v && v.voiceURI === state.config.voiceURI);
         if (selected) return selected;
       }
 
-      const zhCN = voices.find((v) => v && String(v.lang || '').toLowerCase() === 'zh-cn');
-      if (zhCN) return zhCN;
+      const langVoices = filterLangVoices(voices, normalizeVoiceLang(state.config.voiceLang));
+      const langCode = currentSpeechTexts().langCode;
+      return langVoices.find((v) => v.lang === langCode) || langVoices[0] || null;
+    }
 
-      const zh = voices.find((v) => v && String(v.lang || '').toLowerCase().startsWith('zh'));
-      if (zh) return zh;
-
-      return voices[0] || null;
+    function syncVoiceConfigFromSelect() {
+      const voiceURI = els.voiceSelect && els.voiceSelect.value ? String(els.voiceSelect.value) : '';
+      const voice = voiceURI ? getVoices(window.speechSynthesis).find((v) => v && v.voiceURI === voiceURI) : null;
+      state.config.voiceURI = voiceURI;
+      state.config.voiceLang = voiceLangOf(voice) || defaultConfig.voiceLang;
     }
 
     function restoreSpeechQueue(forceCancel) {
@@ -734,7 +815,7 @@
           try {
             const u = new Utter(String(text));
             const preferredVoice = getPreferredVoice(synth);
-            u.lang = preferredVoice && preferredVoice.lang ? preferredVoice.lang : 'zh-CN';
+            u.lang = preferredVoice && preferredVoice.lang ? preferredVoice.lang : currentSpeechTexts().langCode;
             u.rate = 1;
             u.pitch = 1;
             u.volume = 1;
@@ -771,18 +852,28 @@
       if (!synth || !synth.getVoices) return;
 
       const voices = getVoices(synth);
-      const zhVoices = voices.filter((v) => v && v.lang && String(v.lang).toLowerCase().startsWith('zh'));
+      // Some browsers load voices asynchronously; keep the saved choice until they arrive.
+      if (!voices.length) return;
+
       const previous = els.voiceSelect.value;
       const desired = state.config.voiceURI ? String(state.config.voiceURI) : '';
 
       els.voiceSelect.innerHTML = '<option value="">系统默认</option>';
 
-      for (const v of zhVoices) {
-        if (!v || !v.voiceURI) continue;
-        const opt = document.createElement('option');
-        opt.value = v.voiceURI;
-        opt.textContent = v.lang ? `${v.name} (${v.lang})` : v.name;
-        els.voiceSelect.appendChild(opt);
+      for (const lang of Object.keys(speechTexts)) {
+        const langVoices = filterLangVoices(voices, lang);
+        if (!langVoices.length) continue;
+
+        const group = document.createElement('optgroup');
+        group.label = speechTexts[lang].label;
+        for (const v of langVoices) {
+          if (!v.voiceURI) continue;
+          const opt = document.createElement('option');
+          opt.value = v.voiceURI;
+          opt.textContent = v.lang ? `${v.name} (${v.lang})` : v.name;
+          group.appendChild(opt);
+        }
+        els.voiceSelect.appendChild(group);
       }
 
       const trySet = (val) => {
@@ -793,50 +884,40 @@
         return true;
       };
 
-      const pickDefaultVoiceURI = () => {
-        const googleCN = zhVoices.find((v) => v && v.lang === 'zh-CN' && v.name === 'Google 普通话（中国大陆）');
-        if (googleCN && googleCN.voiceURI) return googleCN.voiceURI;
+      const pickDefaultVoiceURI = (lang) => {
+        const langVoices = filterLangVoices(voices, lang);
+        const langCode = speechTexts[lang].langCode;
+        const google = langVoices.find((v) => v.lang === langCode && /^Google /.test(v.name));
+        if (google && google.voiceURI) return google.voiceURI;
 
-        const anyZhCN = zhVoices.find((v) => v && v.lang === 'zh-CN');
-        if (anyZhCN && anyZhCN.voiceURI) return anyZhCN.voiceURI;
+        const anyExact = langVoices.find((v) => v.lang === langCode);
+        if (anyExact && anyExact.voiceURI) return anyExact.voiceURI;
 
-        const anyZh = zhVoices[0];
-        if (anyZh && anyZh.voiceURI) return anyZh.voiceURI;
+        const anyLang = langVoices[0];
+        if (anyLang && anyLang.voiceURI) return anyLang.voiceURI;
 
         return '';
       };
 
-      const defaultVoiceURI = pickDefaultVoiceURI();
-
-      if (trySet(desired)) return;
-      if (trySet(previous)) return;
-      if (!desired && defaultVoiceURI && trySet(defaultVoiceURI)) {
-        state.config.voiceURI = defaultVoiceURI;
-        saveState();
-        return;
+      // A saved voice may now be hidden or uninstalled; fall back to the default voice of its language.
+      if (!trySet(desired) && !trySet(previous) && !trySet(pickDefaultVoiceURI(normalizeVoiceLang(state.config.voiceLang)))) {
+        els.voiceSelect.value = '';
       }
 
-      els.voiceSelect.value = '';
-      if (state.config.voiceURI) {
-        state.config.voiceURI = '';
-        saveState();
-      }
+      syncVoiceConfigFromSelect();
+      saveState();
     }
 
     if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener === 'function') {
-      window.speechSynthesis.addEventListener('voiceschanged', () => {
-        initVoiceOptions();
-        state.config.voiceURI = els.voiceSelect && els.voiceSelect.value ? String(els.voiceSelect.value) : '';
-        saveState();
-      });
+      window.speechSynthesis.addEventListener('voiceschanged', initVoiceOptions);
     }
 
     if (els.voiceSelect) {
       els.voiceSelect.addEventListener('change', () => {
         clearPreTransitionAnnouncement();
-        state.config.voiceURI = els.voiceSelect.value ? String(els.voiceSelect.value) : '';
+        syncVoiceConfigFromSelect();
         saveState();
-        speak('语音音色已切换', 200, { forceCancel: true });
+        speak(currentSpeechTexts().voiceChanged, 200, { forceCancel: true });
       });
     }
 
@@ -1037,11 +1118,11 @@
     }
 
     function restStartSpeechText() {
-      return `开始休息，${state.config.restSeconds}秒`;
+      return currentSpeechTexts().restStart(state.config.restSeconds);
     }
 
     function workStartSpeechText(setNumber) {
-      return `开始训练，第${setNumber}组燕子飞`;
+      return currentSpeechTexts().workStart(setNumber);
     }
 
     function getPreTransitionCue() {
@@ -1234,11 +1315,11 @@
       return advanceExpiredPhases(now, announceTransitions);
     }
 
-    function buildRecoveryMessage() {
-      if (state.phase === 'done') return '训练已完成';
-      if (state.phase === 'work') return `已恢复，第${state.currentSet}组训练，剩余${formatDurationForSpeech(state.phaseRemainingMs)}`;
-      if (state.phase === 'rest') return `已恢复，休息中，剩余${formatDurationForSpeech(state.phaseRemainingMs)}`;
-      return '已恢复';
+    function buildRecoveryMessage(texts) {
+      if (state.phase === 'done') return texts.recoveredDone;
+      if (state.phase === 'work') return texts.recoveredWork(state.currentSet, formatDurationForSpeech(state.phaseRemainingMs, texts));
+      if (state.phase === 'rest') return texts.recoveredRest(formatDurationForSpeech(state.phaseRemainingMs, texts));
+      return texts.recovered;
     }
 
     function updateUI() {
@@ -1318,7 +1399,7 @@
 
       setPhase('work', state.config.workSeconds * 1000);
       toast(`开始训练：第 ${state.currentSet} 组燕子飞 🧜‍♀️`);
-      speak(`开始训练，第${state.currentSet}组燕子飞`);
+      speak(workStartSpeechText(state.currentSet));
       beep(660, 160, 0.06);
 
       runTicker();
@@ -1338,7 +1419,7 @@
       state.phaseEndsAtEpochMs = null;
       state.lastTs = null;
       toast('训练暂停了，随时可以继续！');
-      speak('暂停训练');
+      speak(currentSpeechTexts().pause);
       beep(520, 140, 0.05);
       syncWakeLockWithState();
       updateUI();
@@ -1353,7 +1434,7 @@
       state.paused = false;
       resumePhaseClock(epochMs());
       toast('继续训练，加油！');
-      speak('继续训练');
+      speak(currentSpeechTexts().resume);
       beep(660, 160, 0.06);
       runTicker();
       syncWakeLockWithState();
@@ -1384,7 +1465,7 @@
 
       clearSavedState();
       toast('已重置，随时开始新的训练！');
-      speak('重置训练', 80, { forceCancel: true });
+      speak(currentSpeechTexts().reset, 80, { forceCancel: true });
       beep(392, 120, 0.05);
       setTimeout(() => beep(330, 160, 0.05), 140);
       syncWakeLockWithState();
@@ -1408,7 +1489,7 @@
 
       if (announce) {
         toast('🎉 太棒了！训练全部完成！');
-        speak('训练完成，太棒了');
+        speak(currentSpeechTexts().finish);
         beep(880, 120, 0.06);
         setTimeout(() => beep(660, 140, 0.06), 160);
         setTimeout(() => beep(990, 160, 0.06), 340);
@@ -1481,9 +1562,8 @@
       saveState();
 
       if (shouldAnnounceRecovery && state.config.sound && (isActivePhase(state.phase) || state.phase === 'done')) {
-        const msg = buildRecoveryMessage();
-        toast(msg);
-        speak(msg, 220, { forceCancel: true, showTapHint: true });
+        toast(buildRecoveryMessage(speechTexts.zh));
+        speak(buildRecoveryMessage(currentSpeechTexts()), 220, { forceCancel: true, showTapHint: true });
       }
     }
 
@@ -1495,11 +1575,10 @@
       unlockAudioOutput(speechNeedsGesture);
       if (!speechNeedsGesture || !state.config.sound) return;
 
-      const msg = buildRecoveryMessage();
       speechNeedsGesture = false;
       if (isActivePhase(state.phase) || state.phase === 'done') {
-        toast(msg);
-        speak(msg, 80, { forceCancel: true });
+        toast(buildRecoveryMessage(speechTexts.zh));
+        speak(buildRecoveryMessage(currentSpeechTexts()), 80, { forceCancel: true });
       } else {
         beep(660, 120, 0.05);
       }
